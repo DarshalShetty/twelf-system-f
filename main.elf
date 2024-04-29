@@ -1,0 +1,81 @@
+%% Syntax
+
+tp    : type.
+unit  : tp.
+arrow : tp -> tp -> tp.
+univ  : (tp -> tp) -> tp.
+
+tm    : type.
+empty : tm.
+app   : tm -> tm -> tm.
+lam   : tp -> (tm -> tm) -> tm.
+tapp  : tm -> tp -> tm.
+tlam  : (tp -> tm) -> tm.
+
+%% Static Semantics
+
+of       : tm -> tp -> type.
+of-empty : of empty unit.
+of-lam   : of (lam T2 ([x] E x)) (arrow T2 T)
+            <- ({x: tm} of x T2 -> of (E x) T).
+of-app   : of (app E1 E2) T
+            <- of E1 (arrow T2 T)
+            <- of E2 T2.
+of-tlam  : of (tlam ([x] E x)) (univ ([x] T x))
+            <- ({x} of (E x) (T x)).
+of-tapp  : of (tapp E T') (T T')
+            <- of E (univ ([x] T x)).
+
+%% Dynamic Semantics
+
+value       : tm -> type.
+value-empty : value empty.
+value-lam   : value (lam T ([x] E x)).
+value-tlam  : value (tlam ([x] E x)).
+
+step           : tm -> tm -> type.
+step-app-1     : step (app E1 E2) (app E1' E2)
+                  <- step E1 E1'.
+step-app-2     : step (app E1 E2) (app E1 E2')
+                  <- value E1
+                  <- step E2 E2'.
+step-app-beta  : step (app (lam T2 ([x] E x)) E2) (E E2)
+                  <- value E2.
+step-tapp      : step (tapp E T) (tapp E' T)
+                  <- step E E'.
+step-tapp-beta : step (tapp (tlam ([x] E x)) T) (E T).
+
+preserv : step E E' -> of E T -> of E' T -> type.
+%mode preserv +Dstep +Dof -Dof'.
+
+preserv-app-1 : preserv
+                 (step-app-1 (DstepE1 : step E1 E1') : step (app E1 E2) (app E1' E2))
+                 (of-app (DofE2 : of E2 T2) DofE1)
+                 (of-app DofE2 DofE1')
+                  <- preserv DstepE1 DofE1 (DofE1' : of E1' (arrow T2 T1)).
+
+preserv-app-2 : preserv
+                 (step-app-2 (DstepE2 : step E2 E2') DvalueE1 : step (app E1 E2) (app E1 E2'))
+                 (of-app DofE2 (DofE1 : of E1 (arrow T2 T1)))
+                 (of-app DofE2' DofE1)
+                  <- preserv DstepE2 DofE2 (DofE2' : of E2' T2).
+
+preserv-app-beta : preserv
+                    (step-app-beta DvalueE2 : step (app (lam T2 ([x] E x)) E2) (E E2))
+                    (of-app (DofE2 : of E2 T2) (of-lam (([x] [dx] DofE x dx)
+                                                          : {x : tm} {dx : of x T2} of (E x) T)))
+                    (DofE E2 DofE2).
+
+preserv-tapp : preserv
+                (step-tapp DstepE : step (tapp E T1) (tapp E' T1))
+                (of-tapp DofE : of (tapp E T1) (T T1))
+                (of-tapp DofE' : of (tapp E' T1) (T T1))
+                 <- preserv DstepE DofE  (DofE' : of E' (univ ([x] T x))).
+
+preserv-tapp-beta : preserv
+                     (step-tapp-beta : step (tapp (tlam ([x] E x)) T') (E T'))
+                     (of-tapp (of-tlam (([x] DofE x) : {x : tp} of (E x) (T x))))
+                     (DofE T').
+
+%worlds () (preserv _ _ _).
+%total D (preserv D _ _).
