@@ -158,3 +158,44 @@ progress/tapp : progress (of-tapp (D : of E (univ T))) VosTapp
 
 %worlds () (progress _ _).
 %total D (progress D _).
+
+%%solve D : of (tlam [X] lam (arrow X X) [f] tlam ([X] lam X [x] (app f x))) T.
+
+Nat : tp  = univ [α] arrow α (arrow (arrow α α) α).
+
+zero : tm = tlam [α]
+              lam α [x]
+                lam (arrow α α) [f]
+                  x.
+
+one : tm  = tlam [α]
+              lam α [x]
+                lam (arrow α α) [f]
+                  (app f x).
+
+succ : tm = lam Nat [n]
+              tlam [α]
+                lam α [x]
+                  lam (arrow α α) [f]
+                    app f (app (app (tapp n α) x) f).
+
+iterNat : tm = tlam [α]
+                 lam α [base]
+                   lam (arrow α α) [step]
+                     lam Nat [n]
+                       app (app (tapp n α) base) step.
+
+%solve D : of iterNat T.
+%%solve D : of T (univ ([x:tp] arrow x (arrow (arrow x x) (arrow Nat x)))).
+
++ : tm = lam Nat [m]
+           lam Nat [n]
+             app (app (app (tapp iterNat Nat) n)
+                      (lam Nat [r]
+                         app succ r))
+                 m.
+
+%solve D : of + T.
+
+two : tm = app (app + one) one.
+%solve D : step two N.
