@@ -45,6 +45,8 @@ step-tapp      : step (tapp E T) (tapp E' T)
                   <- step E E'.
 step-tapp-beta : step (tapp (tlam ([x] E x)) T) (E T).
 
+%% Preservation
+
 preserv : step E E' -> of E T -> of E' T -> type.
 %mode preserv +Dstep +Dof -Dof'.
 
@@ -79,3 +81,80 @@ preserv-tapp-beta : preserv
 
 %worlds () (preserv _ _ _).
 %total D (preserv D _ _).
+
+%% Progress
+
+vos : tm -> type. % "value-or-step"
+vos/value : vos E <- value E.
+vos/step : vos E <- step E E'.
+
+progress : of E T -> vos E -> type.
+%mode progress +DofE -VosE.
+
+progress/empty : progress of-empty (vos/value value-empty).
+progress/lam : progress (of-lam _) (vos/value value-lam).
+progress/tlam : progress (of-tlam _) (vos/value value-tlam).
+
+% We can only case-split at top level, so to case-split on whether E1 and E2 are
+% values or step, we need to prove progress for applications separately.
+progress-app : of E1 (arrow T2 T)
+               -> vos E1
+               -> vos E2
+               -> vos (app E1 E2)
+               -> type.
+%mode progress-app +DofE1 +VosE1 +VosE2 -VosApp.
+
+progress-app/step-app-1 : progress-app
+                           _
+                           (vos/step (X : step E1 E1'))
+                           _
+                           (vos/step (step-app-1 X : step (app E1 E2) (app E1' E2))).
+
+progress-app/step-app-2 : progress-app
+                           _
+                           (vos/value (X : value E1))
+                           (vos/step (Y : step E2 E2'))
+                           (vos/step (step-app-2 Y X : step (app E1 E2) (app E1 E2'))).
+
+% Although we never destruct the proof of `of E1 (arrow T2 T)`, it is used in
+% the following case where we see that the only values of arrow type are lambdas.
+progress-app/step-app-beta : progress-app
+                              _
+                              (vos/value (_ : value (lam T E)))
+                              (vos/value (X : value E2))
+                              (vos/step (step-app-beta X : step (app (lam T E) E2) (E E2))).
+
+%worlds () (progress-app _ _ _ _).
+%total {} (progress-app _ _ _ _).
+
+progress/app : progress (of-app (D2 : of E2 T2) (D1 : of E1 (arrow T2 T))) VosApp
+               <- progress D1 (VosE1 : vos E1)
+               <- progress D2 (VosE2 : vos E2)
+               <- progress-app D1 VosE1 VosE2 VosApp.
+
+% The same thing happens for tapp, although the case split is simpler here.
+progress-tapp : {T' : tp} of E (univ T)
+                -> vos E
+                -> vos (tapp E T')
+                -> type.
+%mode progress-tapp +T' +DofE +VosE -VosTapp.
+
+progress-tapp/step-tapp : progress-tapp T'
+                           _
+                           (vos/step (X : step E E'))
+                           (vos/step (step-tapp X : step (tapp E T') (tapp E' T'))).
+
+progress-tapp/step-tapp-beta : progress-tapp T'
+                                _
+                                (vos/value (X : value (tlam E)))
+                                (vos/step step-tapp-beta).
+
+%worlds () (progress-tapp _ _ _ _).
+%total {} (progress-tapp _ _ _ _).
+
+progress/tapp : progress (of-tapp (D : of E (univ T))) VosTapp
+                <- progress D (VosE : vos E)
+                <- progress-tapp _ D VosE VosTapp.
+
+%worlds () (progress _ _).
+%total D (progress D _).
